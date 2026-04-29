@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SOR Method — Interactive Explorer</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #deeaf8;
+    --bg2:     #e8f1fb;
+    --card:    #f0f6ff;
+    --border:  #b8d0ee;
+    --navy:    #1a3260;
+    --navy2:   #2a4a8a;
+    --blue:    #1d60d4;
+    --red:     #d93050;
+    --green:   #0d9060;
+    --amber:   #c47a00;
+    --muted:   #5a7aaa;
+    --text:    #162040;
+    --mono:    'DM Mono', monospace;
+    --sans:    'DM Sans', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 32px 24px;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(26,50,96,0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(26,50,96,0.06) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none; z-index: 0;
+  }
+
+  .page { position: relative; z-index: 1; max-width: 980px; margin: 0 auto; }
+
+  /* header */
+  .header { margin-bottom: 24px; }
+  .header-tag {
+    display: inline-block;
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--navy2); background: rgba(26,50,96,0.08);
+    border: 1px solid var(--border);
+    padding: 3px 11px; border-radius: 4px; margin-bottom: 10px;
+  }
+  .header h1 { font-size: 30px; font-weight: 500; color: var(--navy); margin-bottom: 4px; }
+  .header p  { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+
+  /* equation strip */
+  .eq-strip {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 18px;
+    margin-bottom: 20px;
+    font-family: var(--mono); font-size: 13px;
+    color: var(--muted);
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  .eq-strip .formula { color: var(--navy); }
+  .eq-strip .w { color: var(--blue); font-weight: 500; }
+
+  /* 3-col grid */
+  .three-col {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  /* slider cards */
+  .slider-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px 13px;
+  }
+  .slider-card .lbl { font-size: 12px; color: var(--muted); margin-bottom: 2px; font-family: var(--mono); }
+  .slider-card .val {
+    font-size: 38px; font-weight: 500; line-height: 1.1;
+    margin-bottom: 12px; font-family: var(--mono);
+  }
+  input[type=range] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 4px; border-radius: 2px;
+    background: var(--border);
+    outline: none; cursor: pointer; margin-bottom: 5px;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #fff;
+    border: 2px solid var(--muted);
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(26,50,96,0.15);
+    transition: border-color 0.15s, transform 0.1s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover { border-color: var(--navy); transform: scale(1.1); }
+  .tick-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+  /* preset buttons */
+  .preset-row { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 18px; align-items: center; }
+  .preset-lbl { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+  .preset-btn {
+    font-family: var(--mono); font-size: 11px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--navy2); padding: 5px 13px;
+    border-radius: 6px; cursor: pointer; transition: all 0.15s;
+  }
+  .preset-btn:hover { background: rgba(26,50,96,0.08); border-color: var(--navy2); color: var(--navy); }
+
+  /* iteration count cards */
+  .iter-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    text-align: center;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .iter-card.best {
+    border-color: var(--navy2);
+    box-shadow: 0 0 0 2px rgba(26,50,96,0.1);
+  }
+  .iter-card .iter-n {
+    font-size: 52px; font-weight: 500;
+    font-family: var(--mono); line-height: 1; margin-bottom: 5px;
+  }
+  .iter-card .iter-l { font-size: 13px; color: var(--muted); }
+  .best-tag {
+    display: inline-block; font-size: 11px;
+    color: var(--green); background: rgba(13,144,96,0.1);
+    border: 1px solid rgba(13,144,96,0.25);
+    border-radius: 4px; padding: 2px 8px; margin-top: 6px;
+    font-family: var(--mono);
+  }
+
+  /* chart panel */
+  .chart-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 12px;
+  }
+  .legend { display: flex; gap: 18px; margin-bottom: 14px; flex-wrap: wrap; }
+  .leg { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); font-family: var(--mono); }
+  .leg-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+  .chart-wrap { position: relative; height: 320px; }
+
+  /* x solution */
+  .x-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 12px; }
+  .x-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px; padding: 11px 13px; text-align: center;
+  }
+  .x-card .x-name { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-bottom: 4px; }
+  .x-card .x-val  { font-size: 15px; font-weight: 500; font-family: var(--mono); color: var(--navy); }
+  .x-card .x-err  { font-size: 11px; font-family: var(--mono); margin-top: 3px; }
+
+  /* insight */
+  .insight {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--muted);
+    border-radius: 0 10px 10px 0;
+    padding: 12px 16px;
+    font-size: 13px; color: var(--navy2);
+    line-height: 1.6; margin-bottom: 20px;
+    transition: border-color 0.3s;
+  }
+
+  /* footer */
+  footer {
+    font-size: 11px; color: var(--muted);
+    font-family: var(--mono); text-align: center;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <div class="header-tag">MATH 7231(A) · Spring 2026 · Shakil Ahmed</div>
+    <h1>SOR Method — Interactive Explorer</h1>
+    <p>prog4.m · Successive Over-Relaxation for Ax = b · ω step = 0.02</p>
+  </div>
+
+  <div class="eq-strip">
+    <span>Update rule:</span>
+    <span class="formula">
+      x<sub>i</sub><sup>(k+1)</sup> =
+      (1 − <span class="w">ω</span>) · x<sub>i</sub><sup>(k)</sup>
+      + <span class="w">ω</span> · [ b<sub>i</sub> − Σ a<sub>ij</sub>x<sub>j</sub> ] / a<sub>ii</sub>
+    </span>
+    <span style="margin-left:auto;font-size:12px">x* = [1,2,3,4]ᵀ &nbsp;|&nbsp; ε = 10⁻¹⁰</span>
+  </div>
+
+  <!-- omega sliders -->
+  <div class="three-col">
+    <div class="slider-card">
+      <div class="lbl">omega 1</div>
+      <div class="val" id="v1" style="color:#1d60d4">0.50</div>
+      <input type="range" id="s1" min="0.10" max="1.90" step="0.02" value="0.50">
+      <div class="tick-row"><span>0.1</span><span>1.9</span></div>
+    </div>
+    <div class="slider-card">
+      <div class="lbl">omega 2</div>
+      <div class="val" id="v2" style="color:#d93050">1.00</div>
+      <input type="range" id="s2" min="0.10" max="1.90" step="0.02" value="1.00">
+      <div class="tick-row"><span>0.1</span><span>1.9</span></div>
+    </div>
+    <div class="slider-card">
+      <div class="lbl">omega 3</div>
+      <div class="val" id="v3" style="color:#0d9060">1.50</div>
+      <input type="range" id="s3" min="0.10" max="1.90" step="0.02" value="1.50">
+      <div class="tick-row"><span>0.1</span><span>1.9</span></div>
+    </div>
+  </div>
+
+  <!-- presets -->
+  <div class="preset-row">
+    <span class="preset-lbl">Presets:</span>
+    <button class="preset-btn" onclick="setPreset(0.50,1.00,1.50)">Default</button>
+    <button class="preset-btn" onclick="setPreset(0.30,0.60,0.90)">All under</button>
+    <button class="preset-btn" onclick="setPreset(1.10,1.30,1.50)">All over</button>
+    <button class="preset-btn" onclick="setPreset(0.90,1.00,1.10)">Near GS</button>
+    <button class="preset-btn" onclick="setPreset(0.20,1.00,1.80)">Extremes</button>
+  </div>
+
+  <!-- iteration count cards -->
+  <div class="three-col">
+    <div class="iter-card" id="sc1">
+      <div class="iter-n" style="color:#1d60d4" id="i1">—</div>
+      <div class="iter-l" id="sl1">iterations (ω₁)</div>
+    </div>
+    <div class="iter-card" id="sc2">
+      <div class="iter-n" style="color:#d93050" id="i2">—</div>
+      <div class="iter-l" id="sl2">iterations (ω₂)</div>
+    </div>
+    <div class="iter-card" id="sc3">
+      <div class="iter-n" style="color:#0d9060" id="i3">—</div>
+      <div class="iter-l" id="sl3">iterations (ω₃)</div>
+    </div>
+  </div>
+
+  <!-- chart -->
+  <div class="chart-panel" style="margin-top:12px">
+    <div class="legend">
+      <div class="leg"><div class="leg-dot" style="background:#1d60d4"></div><span id="leg1">ω₁ = 0.50</span></div>
+      <div class="leg"><div class="leg-dot" style="background:#d93050"></div><span id="leg2">ω₂ = 1.00</span></div>
+      <div class="leg"><div class="leg-dot" style="background:#0d9060"></div><span id="leg3">ω₃ = 1.50</span></div>
+      <span style="margin-left:auto;font-size:11px;font-family:var(--mono);color:var(--muted)">log scale (semilogy)</span>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="chart" role="img" aria-label="Semilogy convergence plot for three omega values">Error norm vs iteration for three SOR omega values.</canvas>
+    </div>
+  </div>
+
+  <!-- x solution -->
+  <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:8px">
+    Final x — fastest converging omega &nbsp;(exact = [1, 2, 3, 4])
+  </div>
+  <div class="x-row" id="xgrid"></div>
+
+  <!-- insight -->
+  <div class="insight" id="insight">Adjust the sliders to explore how omega affects convergence.</div>
+
+  <footer>
+    SOR Iterative Method · prog4.m · MATH 7231(A) · Shakil Ahmed · Spring 2026
+    &nbsp;|&nbsp; 4×4 system &nbsp;|&nbsp; ε = 10⁻¹⁰ &nbsp;|&nbsp; ω step = 0.02
+  </footer>
+</div>
+
+<script>
+const A=[[4,-1,-1,0],[-1,4,0,-1],[-1,0,4,-1],[0,-1,-1,4]];
+const b=[-1,3,7,11];
+const xE=[1,2,3,4];
+const TOL=1e-10, MAX=500;
+const COLS=['#1d60d4','#d93050','#0d9060'];
+const SUB=['₁','₂','₃'];
+
+function mysor(omega){
+  let x=[0,0,0,0]; const err=[];
+  for(let it=0;it<MAX;it++){
+    const xo=[...x];
+    for(let i=0;i<4;i++){
+      let s=0; for(let j=0;j<4;j++) if(j!==i) s+=A[i][j]*x[j];
+      const gs=(b[i]-s)/A[i][i];
+      x[i]=(1-omega)*xo[i]+omega*gs;
+    }
+    err.push(Math.sqrt(x.reduce((s,v,i)=>s+(v-xE[i])**2,0)));
+    if(Math.sqrt(x.reduce((s,v,i)=>s+(v-xo[i])**2,0))<TOL) return{x,errors:err,iters:it+1};
+  }
+  return{x,errors:err,iters:MAX};
+}
+
+const ctx=document.getElementById('chart').getContext('2d');
+const chart=new Chart(ctx,{
+  type:'line',
+  data:{labels:[],datasets:[0,1,2].map(i=>({
+    label:`w${i+1}`,data:[],borderColor:COLS[i],
+    backgroundColor:'transparent',pointRadius:0,borderWidth:2.5,tension:0
+  }))},
+  options:{
+    responsive:true,maintainAspectRatio:false,animation:{duration:120},
+    plugins:{
+      legend:{display:false},
+      tooltip:{
+        mode:'index',intersect:false,
+        backgroundColor:'#f0f6ff',
+        borderColor:'#b8d0ee',borderWidth:1,
+        titleColor:'#162040',bodyColor:'#5a7aaa',
+        titleFont:{family:"'DM Mono'",size:12},bodyFont:{family:"'DM Mono'",size:11},
+        callbacks:{
+          title:items=>`Iteration ${items[0].label}`,
+          label:c=>`ω${SUB[c.datasetIndex]} = ${c.parsed.y?.toExponential(2)??'—'}`
+        }
+      }
+    },
+    scales:{
+      x:{
+        title:{display:true,text:'Iteration',color:'#5a7aaa',font:{family:"'DM Mono'",size:12}},
+        ticks:{color:'#5a7aaa',font:{family:"'DM Mono'",size:11},maxTicksLimit:12},
+        grid:{color:'rgba(26,50,96,0.07)'},border:{color:'#b8d0ee'}
+      },
+      y:{
+        type:'logarithmic',
+        title:{display:true,text:'‖error‖ (log scale)',color:'#5a7aaa',font:{family:"'DM Mono'",size:12}},
+        ticks:{color:'#5a7aaa',font:{family:"'DM Mono'",size:11},callback:v=>v.toExponential(0)},
+        grid:{color:'rgba(26,50,96,0.07)'},border:{color:'#b8d0ee'}
+      }
+    }
+  }
+});
+
+function getInsight(omegas,results){
+  const iters=results.map(r=>r.iters);
+  const mi=iters.indexOf(Math.min(...iters));
+  const w=omegas[mi].toFixed(2),n=iters[mi];
+  const divg=iters.filter(i=>i>=MAX).length;
+  if(divg>0) return{c:'#d93050',m:`Warning: one or more omega values hit the ${MAX}-iteration limit and may not have converged. Try moving sliders closer to 1.0.`};
+  if(parseFloat(w)<0.95) return{c:'#c47a00',m:`Under-relaxation (ω = ${w}) is currently fastest with ${n} iterations. For this diagonally dominant system, values near 1.0 typically perform better — try dragging a slider toward 1.0.`};
+  if(parseFloat(w)<=1.05) return{c:'#0d9060',m:`Gauss-Seidel (ω ≈ ${w}) is fastest with ${n} iterations — the expected result for this 4×4 diagonally dominant matrix. The spectral radius ρ(L₁) is naturally small, making ω = 1 optimal here.`};
+  return{c:'#1d60d4',m:`Over-relaxation (ω = ${w}) is fastest with ${n} iterations, accelerating beyond standard Gauss-Seidel for this setting.`};
+}
+
+function run(){
+  const omegas=[+document.getElementById('s1').value,+document.getElementById('s2').value,+document.getElementById('s3').value];
+  const results=omegas.map(mysor);
+  const mxL=Math.max(...results.map(r=>r.errors.length));
+  chart.data.labels=Array.from({length:mxL},(_,i)=>i+1);
+  results.forEach((r,i)=>{chart.data.datasets[i].data=r.errors;});
+  chart.update();
+  const iters=results.map(r=>r.iters);
+  const bi=iters.indexOf(Math.min(...iters));
+  results.forEach((r,i)=>{
+    document.getElementById(`v${i+1}`).textContent=omegas[i].toFixed(2);
+    document.getElementById(`leg${i+1}`).textContent=`ω${SUB[i]} = ${omegas[i].toFixed(2)}`;
+    document.getElementById(`i${i+1}`).textContent=r.iters>=MAX?`${MAX}+`:r.iters;
+    document.getElementById(`sl${i+1}`).textContent=`iterations (ω${SUB[i]})`;
+    const sc=document.getElementById(`sc${i+1}`);
+    sc.classList.toggle('best',i===bi);
+    let tag=sc.querySelector('.best-tag');
+    if(i===bi){if(!tag){tag=document.createElement('div');tag.className='best-tag';sc.appendChild(tag);}tag.textContent='★ fastest';}
+    else if(tag) tag.remove();
+  });
+  const bx=results[bi].x;
+  document.getElementById('xgrid').innerHTML=['x₁','x₂','x₃','x₄'].map((nm,i)=>{
+    const v=bx[i],e=Math.abs(v-xE[i]);
+    const col=e<1e-8?'#0d9060':e<1e-4?'#c47a00':'#d93050';
+    return`<div class="x-card"><div class="x-name">${nm} (exact = ${xE[i]})</div><div class="x-val">${v.toFixed(6)}</div><div class="x-err" style="color:${col}">error = ${e.toExponential(1)}</div></div>`;
+  }).join('');
+  const{c,m}=getInsight(omegas,results);
+  const ins=document.getElementById('insight');
+  ins.style.borderLeftColor=c; ins.textContent=m;
+}
+
+function setPreset(a,b2,c){document.getElementById('s1').value=a;document.getElementById('s2').value=b2;document.getElementById('s3').value=c;run();}
+['s1','s2','s3'].forEach(id=>document.getElementById(id).addEventListener('input',run));
+run();
+</script>
+</body>
+</html>
